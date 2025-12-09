@@ -93,6 +93,7 @@ class ProfileDeleteView(LoginRequiredMixin, DeleteView):
     template_name = 'blog/profile_confirm_delete.html'
 
     def get_object(self):
+        # Удалять можно ТОЛЬКО свой профиль
         return self.request.user.profile
 
 

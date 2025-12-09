@@ -10,15 +10,17 @@ class Profile(models.Model):
     bio = models.TextField(max_length=500, blank=True)
 
     def __str__(self):
-        return f'{self.user.username}'
+        return f"{self.user.username}'s profile"
 
-# Автоматическое создание профиля при создании пользователя
+
+# Создаём профиль при создании пользователя
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
     if created:
-        Profile.objects.create(user=instance)
+        Profile.objects.get_or_create(user=instance)
 
-# Удаление пользователя при удалении профиля
+
+# Удаляем пользователя при удалении профиля → каскадно удалятся посты и комментарии
 @receiver(post_delete, sender=Profile)
 def delete_user_with_profile(sender, instance, **kwargs):
     if instance.user:
