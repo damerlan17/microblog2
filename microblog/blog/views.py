@@ -1,22 +1,49 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth import login
 from django.contrib.auth.forms import UserCreationForm
-from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.urls import reverse_lazy
-from .models import Post, Profile, Like, Comment
 from django.core.paginator import Paginator
+from django.contrib.auth.decorators import login_required
+from .models import Post, Profile, Like, Comment
 
-# Главная страница — последние 50 постов
+# Главная страница — последние 50 постов с лайками
 class PostListView(ListView):
     model = Post
     template_name = 'blog/home.html'
     context_object_name = 'posts'
-    paginate_by = 10  # пагинация
+    paginate_by = 10
 
     def get_queryset(self):
         return Post.objects.all().order_by('-created_on')[:50]
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        if self.request.user.is_authenticated:
+            for post in context['object_list']:
+                post.user_has_liked = post.like_set.filter(user=self.request.user).exists()
+        else:
+            for post in context['object_list']:
+                post.user_has_liked = False
+        return context
+
+# Просмотр одного поста
+class PostDetailView(DetailView):
+    model = Post
+    template_name = 'blog/post_detail.html'
+    context_object_name = 'post'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        post = self.object
+        context['comments'] = post.comment_set.all().order_by('created_on')
+        # Передаём флаг лайка в шаблон
+        if self.request.user.is_authenticated:
+            context['user_has_liked'] = post.like_set.filter(user=self.request.user).exists()
+        else:
+            context['user_has_liked'] = False
+        return context
 
 # Регистрация
 class RegisterView(CreateView):
@@ -35,17 +62,28 @@ class ProfileView(DetailView):
     template_name = 'blog/profile.html'
     context_object_name = 'profile'
 
-    def get_object(self):
-        return get_object_or_404(Profile, pk=self.kwargs['pk'])
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        profile_user = context['profile'].user
+        posts = Post.objects.filter(author=profile_user).order_by('-created_on')
+        paginator = Paginator(posts, 10)
+        page_number = self.request.GET.get('page')
+        context['page_obj'] = paginator.get_page(page_number)
+        return context
 
 class ProfileUpdateView(LoginRequiredMixin, UpdateView):
     model = Profile
     fields = ['avatar', 'bio']
     template_name = 'blog/profile_edit.html'
-    success_url = '/'
+    success_url = reverse_lazy('home')
 
     def get_object(self):
         return self.request.user.profile
+
+from django.views.generic import DeleteView
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.urls import reverse_lazy
+from .models import Profile
 
 class ProfileDeleteView(LoginRequiredMixin, DeleteView):
     model = Profile
@@ -86,20 +124,20 @@ class PostDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
 
 # Лайки
 @login_required
-def like_post(request, pk):
-    post = get_object_or_404(Post, pk=pk)
+def toggle_like(request, pk):
+    post = get_object_or_404(Post, id=pk)
     like, created = Like.objects.get_or_create(user=request.user, post=post)
     if not created:
         like.delete()
-    return redirect('post_detail', pk=pk)
+    return redirect('post_detail', pk=post.pk)
 
-# Комментарии
 @login_required
 def add_comment(request, pk):
     post = get_object_or_404(Post, pk=pk)
     if request.method == 'POST':
         content = request.POST.get('content')
-        Comment.objects.create(post=post, author=request.user, content=content)
+        if content.strip():
+            Comment.objects.create(post=post, author=request.user, content=content)
     return redirect('post_detail', pk=pk)
 
 class CommentUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
@@ -124,21 +162,3 @@ class CommentDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     def test_func(self):
         comment = self.get_object()
         return self.request.user == comment.author
-
-
-def home(request):
-    posts = Post.objects.all().order_by('-created_at')[:50]
-
-    # Добавляем флаг "уже лайкнул?"
-    if request.user.is_authenticated:
-        for post in posts:
-            post.user_has_liked = post.like_set.filter(user=request.user).exists()
-    else:
-        for post in posts:
-            post.user_has_liked = False
-
-    paginator = Paginator(posts, 10)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-
-    return render(request, 'blog/home.html', {'page_obj': page_obj})
