@@ -67,8 +67,8 @@ class ProfileView(DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        profile_user = context['profile'].user
-        posts = Post.objects.filter(author=profile_user).order_by('-created_on')
+        # Посты этого пользователя
+        posts = self.object.user.post_set.all().order_by('-created_on')
         paginator = Paginator(posts, 10)
         page_number = self.request.GET.get('page')
         context['page_obj'] = paginator.get_page(page_number)
