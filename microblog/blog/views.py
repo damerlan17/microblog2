@@ -8,7 +8,8 @@ from django.core.paginator import Paginator
 from django.contrib.auth.decorators import login_required
 from .models import Post, Profile, Like, Comment
 
-# Главная страница — последние 50 постов с лайками
+
+# Главная страница — последние 50 постов
 class PostListView(ListView):
     model = Post
     template_name = 'blog/home.html'
@@ -28,6 +29,7 @@ class PostListView(ListView):
                 post.user_has_liked = False
         return context
 
+
 # Просмотр одного поста
 class PostDetailView(DetailView):
     model = Post
@@ -38,12 +40,12 @@ class PostDetailView(DetailView):
         context = super().get_context_data(**kwargs)
         post = self.object
         context['comments'] = post.comment_set.all().order_by('created_on')
-        # Передаём флаг лайка в шаблон
         if self.request.user.is_authenticated:
             context['user_has_liked'] = post.like_set.filter(user=self.request.user).exists()
         else:
             context['user_has_liked'] = False
         return context
+
 
 # Регистрация
 class RegisterView(CreateView):
@@ -56,7 +58,8 @@ class RegisterView(CreateView):
         login(self.request, user)
         return redirect(self.success_url)
 
-# Профиль
+
+# Профиль пользователя
 class ProfileView(DetailView):
     model = Profile
     template_name = 'blog/profile.html'
@@ -71,6 +74,8 @@ class ProfileView(DetailView):
         context['page_obj'] = paginator.get_page(page_number)
         return context
 
+
+# Редактирование профиля
 class ProfileUpdateView(LoginRequiredMixin, UpdateView):
     model = Profile
     fields = ['avatar', 'bio']
@@ -80,11 +85,8 @@ class ProfileUpdateView(LoginRequiredMixin, UpdateView):
     def get_object(self):
         return self.request.user.profile
 
-from django.views.generic import DeleteView
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.urls import reverse_lazy
-from .models import Profile
 
+# Удаление профиля (и связанного пользователя → каскадное удаление постов/комментариев)
 class ProfileDeleteView(LoginRequiredMixin, DeleteView):
     model = Profile
     success_url = reverse_lazy('home')
@@ -93,7 +95,8 @@ class ProfileDeleteView(LoginRequiredMixin, DeleteView):
     def get_object(self):
         return self.request.user.profile
 
-# Посты
+
+# Создание поста
 class PostCreateView(LoginRequiredMixin, CreateView):
     model = Post
     fields = ['content']
@@ -104,6 +107,8 @@ class PostCreateView(LoginRequiredMixin, CreateView):
         form.instance.author = self.request.user
         return super().form_valid(form)
 
+
+# Редактирование поста
 class PostUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     model = Post
     fields = ['content']
@@ -113,6 +118,8 @@ class PostUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         post = self.get_object()
         return self.request.user == post.author
 
+
+# Удаление поста
 class PostDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     model = Post
     success_url = reverse_lazy('home')
@@ -122,24 +129,29 @@ class PostDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
         post = self.get_object()
         return self.request.user == post.author
 
-# Лайки
+
+# Лайк/дизлайк поста
 @login_required
 def toggle_like(request, pk):
-    post = get_object_or_404(Post, id=pk)
+    post = get_object_or_404(Post, pk=pk)
     like, created = Like.objects.get_or_create(user=request.user, post=post)
     if not created:
         like.delete()
     return redirect('post_detail', pk=post.pk)
 
+
+# Добавление комментария
 @login_required
 def add_comment(request, pk):
     post = get_object_or_404(Post, pk=pk)
     if request.method == 'POST':
-        content = request.POST.get('content')
-        if content.strip():
+        content = request.POST.get('content', '').strip()
+        if content:
             Comment.objects.create(post=post, author=request.user, content=content)
     return redirect('post_detail', pk=pk)
 
+
+# Редактирование комментария
 class CommentUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     model = Comment
     fields = ['content']
@@ -152,6 +164,8 @@ class CommentUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     def get_success_url(self):
         return self.object.post.get_absolute_url()
 
+
+# Удаление комментария
 class CommentDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     model = Comment
     template_name = 'blog/comment_confirm_delete.html'
