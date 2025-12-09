@@ -1,0 +1,18 @@
+{% extends 'blog/base.html' %}
+{% block content %}
+<h2>Регистрация</h2>
+<form method="post">
+    {% csrf_token %}
+    <div class="mb-3">
+        <label for="username">Имя пользователя:</label>
+        <input type="text" name="username" id="username" class="form-control" required minlength="3" maxlength="150">
+        <div class="form-text">Может содержать буквы, цифры и символы @/./+/-/_</div>
+    </div>
+    <div class="mb-3">
+        <label for="password">Пароль:</label>
+        <input type="password" name="password" id="password" class="form-control" required minlength="6">
+    </div>
+    <button type="submit" class="btn btn-success">Создать аккаунт</button>
+</form>
+<p>Уже есть аккаунт? <a href="{% url 'login' %}">Войдите</a></p>
+{% endblock %}

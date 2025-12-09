@@ -6,7 +6,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.urls import reverse_lazy
 from .models import Post, Profile, Like, Comment
-from django.http import JsonResponse
+from django.core.paginator import Paginator
 
 # Главная страница — последние 50 постов
 class PostListView(ListView):
@@ -16,7 +16,7 @@ class PostListView(ListView):
     paginate_by = 10  # пагинация
 
     def get_queryset(self):
-        return Post.objects.all().order_by('-created_at')[:50]
+        return Post.objects.all().order_by('-created_on')[:50]
 
 # Регистрация
 class RegisterView(CreateView):
@@ -124,3 +124,21 @@ class CommentDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     def test_func(self):
         comment = self.get_object()
         return self.request.user == comment.author
+
+
+def home(request):
+    posts = Post.objects.all().order_by('-created_at')[:50]
+
+    # Добавляем флаг "уже лайкнул?"
+    if request.user.is_authenticated:
+        for post in posts:
+            post.user_has_liked = post.like_set.filter(user=request.user).exists()
+    else:
+        for post in posts:
+            post.user_has_liked = False
+
+    paginator = Paginator(posts, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'blog/home.html', {'page_obj': page_obj})

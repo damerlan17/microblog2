@@ -1,0 +1,13 @@
+{% extends 'blog/base.html' %}
+{% block content %}
+<div class="alert alert-danger">
+    <h3>⚠️ Удаление профиля</h3>
+    <p>Вы уверены, что хотите удалить свой профиль?</p>
+    <p><strong>Все ваши посты и комментарии будут безвозвратно удалены!</strong></p>
+    <form method="post" class="d-inline">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Да, удалить</button>
+    </form>
+    <a href="{% url 'profile' user.id %}" class="btn btn-secondary">Отмена</a>
+</div>
+{% endblock %}

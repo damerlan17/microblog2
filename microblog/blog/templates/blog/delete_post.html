@@ -1,0 +1,12 @@
+{% extends 'blog/base.html' %}
+{% block content %}
+<div class="alert alert-warning">
+    <h3>Удалить пост?</h3>
+    <p>«{{ post.content|truncatechars:50 }}»</p>
+    <form method="post" class="d-inline">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Удалить</button>
+    </form>
+    <a href="{% url 'post_detail' post.id %}" class="btn btn-secondary">Отмена</a>
+</div>
+{% endblock %}
